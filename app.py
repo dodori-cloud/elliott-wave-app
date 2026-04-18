@@ -2,49 +2,56 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# 1. 대상 종목 리스트 (예시: S&P 500 + Nasdaq 100 중복 제거)
-# 실제로는 S&P 500 ticker 리스트를 불러와서 처리합니다.
-tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'] 
+st.set_page_config(layout="wide")
+st.title("🚀 유망 종목 스크리닝 엔진 (월봉 기준)")
 
-def get_ticker_data(ticker):
-    stock = yf.Ticker(ticker)
-    info = stock.info
-    
-    # 데이터 로드 (월봉, 주봉, 일봉)
-    df_m = yf.download(ticker, period="5y", interval="1mo", progress=False)
-    df_w = yf.download(ticker, period="2y", interval="1wk", progress=False)
-    df_d = yf.download(ticker, period="1y", interval="1d", progress=False)
-    
-    # 1. 월봉 매물대 중심 (VWAP)
-    vwap = (df_m['Volume'] * ((df_m['High'] + df_m['Low'] + df_m['Close']) / 3)).sum() / df_m['Volume'].sum()
-    
-    # 2. 기관 보유 비중
-    inst_own = info.get('institutionalOwnershipPercent', 0)
-    
-    # 3. 40주 이평선 (주봉 기준)
-    ma40_w = df_w['Close'].rolling(window=40).mean().iloc[-1]
-    
-    # 4. RSI (일봉, 주봉)
-    def get_rsi(df, period=14):
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs.iloc[-1]))
+# 대상 종목 리스트 (간소화하여 실행 확인 후 확장하세요)
+tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA']
 
-    return {
-        'Ticker': ticker,
-        'Above_VWAP': df_d['Close'].iloc[-1] > vwap,
-        'Inst_Own': inst_own,
-        'Above_MA40W': df_w['Close'].iloc[-1] > ma40_w,
-        'RSI_Daily': get_rsi(df_d),
-        'RSI_Weekly': get_rsi(df_w)
-    }
+@st.cache_data(ttl=3600)
+def get_stock_metrics(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        # 월봉, 주봉, 일봉 데이터 로드 (3년)
+        df_m = yf.download(ticker, period="3y", interval="1mo", progress=False)
+        df_w = yf.download(ticker, period="3y", interval="1wk", progress=False)
+        df_d = yf.download(ticker, period="3y", interval="1d", progress=False)
+        
+        if df_m.empty or df_w.empty or df_d.empty: return None
 
-# 실행
-results = [get_ticker_data(t) for t in tickers]
-df_final = pd.DataFrame(results)
+        # 1. 매물대 중심 (VWAP)
+        vwap = (df_m['Volume'] * ((df_m['High'] + df_m['Low'] + df_m['Close']) / 3)).sum() / df_m['Volume'].sum()
+        
+        # 2. 40주 이평선 (주봉)
+        ma40_w = df_w['Close'].rolling(window=40).mean().iloc[-1]
+        
+        # 3. RSI
+        def get_rsi(df, period=14):
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            rs = gain / loss
+            return 100 - (100 / (1 + rs.iloc[-1]))
 
-# 조건에 맞는 종목 필터링 (OR 조건 적용)
-final_list = df_final[df_final['Above_VWAP'] == True]
-st.dataframe(final_list)
+        return {
+            'Ticker': ticker,
+            'Price': df_d['Close'].iloc[-1],
+            'VWAP': vwap,
+            'Above_VWAP': df_d['Close'].iloc[-1] > vwap,
+            'Above_MA40W': df_w['Close'].iloc[-1] > ma40_w,
+            'RSI_D': get_rsi(df_d),
+            'RSI_W': get_rsi(df_w)
+        }
+    except:
+        return None
+
+if st.button("종목 스크리닝 시작"):
+    with st.spinner('종목 데이터를 분석 중입니다...'):
+        data = [get_stock_metrics(t) for t in tickers]
+        df_final = pd.DataFrame([d for d in data if d is not None])
+        
+        # 필터링 조건 (매물대 중심 위에 있는 종목만)
+        filtered_df = df_final[df_final['Above_VWAP'] == True]
+        
+        st.subheader("✅ 필터링된 유망 종목 리스트")
+        st.dataframe(filtered_df, use_container_width=True)
