@@ -3,15 +3,14 @@ import yfinance as yf
 import pandas as pd
 import time
 
-# 1. 설정 및 UI
+# 1. 페이지 및 UI 설정
 st.set_page_config(page_title="기관 수급 스캐너", layout="wide")
-st.title("🚀 기관 수급 데이터 찌꺼기 제거 스캐너")
+st.title("🚀 데이터 찌꺼기 완벽 제거 스캐너")
 
-# 2. 캐싱 및 데이터 로직
+# 2. 캐싱 및 데이터 로직 (야후 파이낸스 차단 방지)
 @st.cache_data(ttl=3600)
 def get_stock_data(ticker):
-    # 요청 간격을 충분히 두어 야후 서버 차단 방지
-    time.sleep(2.5) 
+    time.sleep(2.5) # 요청 간격 충분히 확보
     df = yf.download(ticker, period="1y", interval="1mo", auto_adjust=True, progress=False)
     return df
 
@@ -20,11 +19,11 @@ tickers = ['MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'AMD']
 # 3. 메인 분석 프로세스
 if st.button("최종 정밀 스캔 시작"):
     data = []
-    status_text = st.empty() # 상태 표시창 생성
+    status_text = st.empty()
     
     with st.spinner('기관 수급 데이터 분석 중...'):
         for ticker in tickers:
-            status_text.text(f"분석 중: {ticker}...") # 현재 분석 종목 표시
+            status_text.text(f"분석 중: {ticker}...")
             try:
                 df = get_stock_data(ticker)
                 
@@ -53,14 +52,17 @@ if st.button("최종 정밀 스캔 시작"):
             except Exception:
                 continue
     
-    status_text.empty() # 스캔 완료 후 텍스트 제거
+    status_text.empty()
     
-    # 4. 결과 출력
+    # 4. 결과 출력 (데이터가 있으면 무조건 출력)
     if data:
         st.table(pd.DataFrame(data))
     else:
-        st.error("스캔이 완료되었으나 유효한 데이터를 찾지 못했습니다.")
+        st.error("데이터를 불러오지 못했습니다. 종목 리스트나 네트워크를 확인하세요.")
 
+# 5. 가이드
 st.write("---")
 st.write("### 🚦 매매 판단 기준")
-st.write("* **강력 매수신호:** 괴리율 10% 미만 + 거래량 증가(기관 매집 신호)")
+st.write("* **강력 매수신호:** 괴리율 10% 미만 + 거래량 증가")
+st.write("* **보유 유지:** 괴리율 10% ~ 30%")
+st.write("* **매도 고려:** 괴리율 30% 초과")
