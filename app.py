@@ -19,7 +19,7 @@ if st.button("전체 종목 자동 스캔 시작"):
             current_price = df_d['Close'].iloc[-1]
             
             # 필터링 조건: 매물대 중심(VWAP) 위에 있는 종목만!
-            if current_price > vwap:
+        
                 results.append({'Ticker': ticker, 'Price': current_price, 'VWAP': vwap})
         except:
             continue
