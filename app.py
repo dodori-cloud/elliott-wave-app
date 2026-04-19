@@ -2,27 +2,32 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-def calculate_clean_vwap(ticker):
-    # 월봉 데이터로 VWAP 계산
-    df = yf.download(ticker, period="3y", interval="1mo", progress=False)
-    # 데이터가 비어있지 않은지 확인
-    if df.empty: return None
-    
-    # 순수 숫자 값만 추출 (텍스트 제거)
-    volume = df['Volume'].astype(float)
-    price = ((df['High'] + df['Low'] + df['Close']) / 3).astype(float)
-    
-    vwap = (price * volume).sum() / volume.sum()
-    current_price = yf.Ticker(ticker).history(period="1d")['Close'].iloc[-1]
-    
-    return current_price, vwap
+st.set_page_config(layout="wide")
+st.title("🚀 데이터 검증 완료: 종목 발굴 스캐너")
 
-# 결과 출력 로직
-if st.button("정밀 스캔 시작"):
-    ticker = 'NVDA' # 예시
-    price, vwap = calculate_clean_vwap(ticker)
-    deviation = ((price - vwap) / vwap) * 100
+tickers = ['MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'AMD']
+
+if st.button("정밀 스캔 실행"):
+    data = []
+    for ticker in tickers:
+        df_m = yf.download(ticker, period="3y", interval="1mo", progress=False)
+        df_d = yf.download(ticker, period="1d", progress=False)
+        
+        if not df_m.empty and not df_d.empty:
+            # VWAP 계산 (정밀하게)
+            vwap = (df_m['Volume'] * ((df_m['High'] + df_m['Low'] + df_m['Close']) / 3)).sum() / df_m['Volume'].sum()
+            price = float(df_d['Close'].iloc[-1])
+            
+            # 괴리율 계산 (%)
+            deviation = ((price - vwap) / vwap) * 100
+            
+            data.append({
+                'Ticker': ticker,
+                'Price': round(price, 2),
+                'VWAP': round(vwap, 2),
+                'Deviation(%)': round(deviation, 2),
+                'Status': '⚠️과열' if deviation > 40 else '✅양호'
+            })
     
-    st.write(f"현재가: {price:.2f}")
-    st.write(f"정밀 VWAP: {vwap:.2f}")
-    st.write(f"순수 괴리율: {deviation:.2f}%")
+    df_results = pd.DataFrame(data)
+    st.dataframe(df_results, use_container_width=True)
