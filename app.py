@@ -19,7 +19,7 @@ if st.button("최종 정밀 스캔 시작"):
     data = []
     for ticker in tickers:
         try:
-            df = yf.download(ticker, period="3y", interval="1mo", progress=False)
+            df = yf.download(ticker, period="5y", interval="1mo", progress=False)
             if not df.empty and 'Volume' in df.columns:
                 vwap = (df['Volume'] * ((df['High'] + df['Low'] + df['Close']) / 3)).sum() / df['Volume'].sum()
                 price = df['Close'].iloc[-1]
